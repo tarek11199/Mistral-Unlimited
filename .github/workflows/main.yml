@@ -1,0 +1,88 @@
+name: Mistral API Key Generator
+
+on:
+  workflow_dispatch:
+    inputs:
+      total_tasks:
+        description: 'Total accounts/keys to generate'
+        required: true
+        default: '5'
+      concurrency:
+        description: 'Max parallel concurrent browser instances'
+        required: true
+        default: '3'
+      alias:
+        description: 'Custom email alias (optional, single task mode only)'
+        required: false
+        default: ''
+      domain_id:
+        description: 'Custom domain ID (optional, single task mode only)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  run-generator:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Chrome dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable || sudo apt-get install -y libasound2t64 libatk-bridge2.0-0 libgtk-3-0 libnss3 || true
+
+      - name: Install Node.js dependencies
+        run: npm install
+
+      - name: Install Puppeteer Chrome Binary
+        run: npx puppeteer browsers install chrome
+
+      - name: Execute API Key Generator Script
+        run: |
+          ALIAS="${{ github.event.inputs.alias }}"
+          DOMAIN_ID="${{ github.event.inputs.domain_id }}"
+          TASKS="${{ github.event.inputs.total_tasks }}"
+          CONCURRENCY="${{ github.event.inputs.concurrency }}"
+
+          if [ -n "$ALIAS" ] && [ -n "$DOMAIN_ID" ]; then
+            echo "Running in custom email alias mode..."
+            node run.js "$ALIAS" "$DOMAIN_ID"
+          else
+            echo "Running in parallel batch mode (Tasks: $TASKS, Concurrency: $CONCURRENCY)..."
+            node run.js "$TASKS" "$CONCURRENCY"
+          fi
+
+      - name: Commit and push updated api_keys.txt to repository root
+        if: always()
+        run: |
+          if [ -f api_keys.txt ]; then
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add api_keys.txt
+            git commit -m "Auto-update api_keys.txt with newly generated keys [skip ci]" || echo "No changes to commit"
+            git push
+          fi
+
+      - name: Display Summary
+        if: always()
+        run: |
+          if [ -f api_keys.txt ]; then
+            echo "### 🔑 Generated API Keys" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            cat api_keys.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No api_keys.txt file was generated." >> $GITHUB_STEP_SUMMARY
+          fi
