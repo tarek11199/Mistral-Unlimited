@@ -1,0 +1,12 @@
+{
+	"name": "mistral-login-opener",
+	"version": "1.0.0",
+	"description": "Opens Mistral login page in a visible browser",
+	"main": "run.js",
+	"scripts": {
+		"start": "node run.js"
+	},
+	"dependencies": {
+		"puppeteer": "^23.0.0"
+	}
+}
